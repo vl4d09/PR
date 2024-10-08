@@ -7,28 +7,38 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
 import time
 
-# Set up the WebDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 
-# Specify the ASOS URL for a specific category or product page
 url = 'https://www.asos.com/men/a-to-z-of-brands/asos-design/cat/?cid=27871&refine=attribute_10992:61388'
 
-# Open the URL
 driver.get(url)
 
-# Wait for the page to load
 wait = WebDriverWait(driver, 10)
 
-# Extract product elements
 products = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'productTile_U0clN')))
 
-# Limit the number of products to process
-max_products = 5  # Change this to the desired number of products
+max_products = 2  
 
-# Iterate through the first max_products
-for i, product in enumerate(products[:max_products]):  # Only take the first max_products
+def clean_and_validate_data(name, price):
+    name = name.strip()
+    
+    price = price.replace('£', '').strip()  
+
     try:
-        # Wait for the product element to be present again
+        price = float(price)  # Convert to float to handle prices like 40.00
+        if price.is_integer():  
+            price = int(price)  # Convert to int if it is
+        else:
+            raise ValueError("Price must be a valid integer.")
+    except ValueError:
+        raise ValueError("Price must be a valid integer.")
+
+    return name, price
+
+for i in range(min(max_products, len(products))):  # Use range to avoid index out of range
+    try:
+        product = products[i] 
+
         wait.until(EC.visibility_of(product))
 
         # Extract the name
@@ -37,37 +47,41 @@ for i, product in enumerate(products[:max_products]):  # Only take the first max
         # Extract the price
         price = product.find_element(By.CLASS_NAME, 'container_s8SSI').text if product.find_elements(By.CLASS_NAME, 'container_s8SSI') else 'N/A'
 
+        # Clean and validate data
+        try:
+            name, price = clean_and_validate_data(name, price)
+        except ValueError as ve:
+            print(f"Validation error for product {i + 1}: {ve}")
+            continue  
+
         # Extract the product link
         link = product.find_element(By.TAG_NAME, 'a').get_attribute('href') if product.find_elements(By.TAG_NAME, 'a') else 'N/A'
 
-        print(f"Product {i + 1}: {name}, Price: {price}, Link: {link}")
+        print(f"Product {i + 1}: {name}, Price: £{price}, Link: {link}")
 
-        # Navigate to the product link to extract more details
         driver.get(link)
 
-        # Wait for the product details page to load
-        time.sleep(2)  # Adjust the sleep time as necessary
+        time.sleep(2)  # As u like adjust 
 
-        # Example: Extract additional details (modify the selectors as needed)
         try:
-            description = driver.find_element(By.CLASS_NAME, 'Jk9Oz').text if driver.find_elements(By.CLASS_NAME, 'Jk9Oz') else 'No description available'
+            description = driver.find_element(By.CLASS_NAME, 'nnYzW').text if driver.find_elements(By.CLASS_NAME, 'nnYzW') else 'No description available'
             print(f"Description: {description}")
         except Exception as e:
             print(f"Error extracting description: {e}")
 
-        # Go back to the previous page
         driver.back()
 
-        # Re-fetch the products list after going back
+        time.sleep(2)  
+
         products = wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, 'productTile_U0clN')))
 
     except StaleElementReferenceException:
         print("Stale element reference encountered. Retrying this product...")
-        continue  # Continue to the next product
+        continue 
 
     except TimeoutException:
         print("Timed out waiting for product elements.")
-        break  # Exit the loop if elements cannot be found
+        break 
 
     except Exception as e:
         print(f"An error occurred: {e}")
