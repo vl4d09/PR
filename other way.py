@@ -69,6 +69,66 @@ def fetch_product_description(link):
         return description_element.text.strip() if description_element else 'No description available'
     return 'Failed to fetch description'
 
+def custom_serialize(data):
+    serialized = []
+    for key, value in data.items():
+        if isinstance(value, list):
+            serialized.append(f"{key}: [{','.join(map(str, value))}]")
+        elif isinstance(value, dict):
+            serialized.append(f"{key}: {{{','.join([f'{k}:{v}' for k, v in value.items()])}}}")
+        else:
+            serialized.append(f"{key}: {value}")
+    return "; ".join(serialized)
+
+def custom_deserialize(serialized_str):
+    deserialized = {}
+    items = serialized_str.split("; ")
+    for item in items:
+        if ': [' in item:
+            key, value = item.split(": [")
+            value = value.rstrip(']').split(',')
+            deserialized[key] = [v.strip() for v in value]
+        elif ': {' in item:
+            key, value = item.split(": {")
+            value = value.rstrip('}').split(',')
+            deserialized[key] = {}
+            for v in value:
+                k, v = v.split(':')
+                deserialized[key][k.strip()] = v.strip()
+        else:
+            key, value = item.split(": ")
+            deserialized[key] = value.strip()
+    return deserialized
+
+def serialize_to_json(data):
+    import json
+    return json.dumps(data, indent=4)
+
+def deserialize_from_json(serialized_str):
+    import json
+    return json.loads(serialized_str)
+
+def serialize_to_xml(data):
+    xml = ['<products>']
+    for product in data.get('filtered_products', []):
+        xml.append('  <product>')
+        for key, value in product.items():
+            xml.append(f'    <{key}>{value}</{key}>')
+        xml.append('  </product>')
+    xml.append('</products>')
+    return '\n'.join(xml)
+
+def deserialize_from_xml(serialized_str):
+    from xml.etree import ElementTree as ET
+    root = ET.fromstring(serialized_str)
+    products = []
+    for product in root.findall('product'):
+        product_data = {}
+        for child in product:
+            product_data[child.tag] = child.text
+        products.append(product_data)
+    return {'filtered_products': products}
+
 url = 'https://xstore.md/monitoare'
 html_content = fetch_html(url)
 
@@ -80,7 +140,7 @@ if html_content:
     processed_count = 0
 
     for product in product_tiles:
-        if processed_count >= 2:
+        if processed_count >= 5:
             break
         try:
             name_element = product.find('a', class_='xp-title')
@@ -104,7 +164,7 @@ if html_content:
                 'price_mdl': price_mdl,
                 'price_eur': price_eur,
                 'link': link,
-                'description': description,  
+                'description': description,
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
             })
 
@@ -113,15 +173,44 @@ if html_content:
         except Exception as e:
             print(f"Error extracting product data: {e}")
 
-    filtered_products = filter_products(product_data, 50, 150)
+    filtered_products = filter_products(product_data, 50, 5000)
 
     final_data_model = {
         'filtered_products': filtered_products,
         'timestamp': datetime.utcnow().isoformat() + 'Z'
     }
 
-    print("Final Data Model:")
-    print(final_data_model)
+    format_choice = input("Choose output format (json, xml, custom): ").strip().lower()
+
+    if format_choice == "json":
+        serialized_data = serialize_to_json(final_data_model)
+        print("Serialized Data in JSON:")
+        print(serialized_data)
+
+        deserialized_data = deserialize_from_json(serialized_data)
+        print("Deserialized Data from JSON:")
+        print(deserialized_data)
+
+    elif format_choice == "xml":
+        serialized_data = serialize_to_xml(final_data_model)
+        print("Serialized Data in XML:")
+        print(serialized_data)
+
+        deserialized_data = deserialize_from_xml(serialized_data)
+        print("Deserialized Data from XML:")
+        print(deserialized_data)
+
+    elif format_choice == "custom":
+        serialized_data = custom_serialize(final_data_model)
+        print("Serialized Data in Custom Format:")
+        print(serialized_data)
+
+        deserialized_data = custom_deserialize(serialized_data)
+        print("Deserialized Data from Custom Format:")
+        print(deserialized_data)
+
+    else:
+        print("Invalid format choice.")
 
 else:
     print("No HTML content to parse.")
