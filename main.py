@@ -43,8 +43,8 @@ def clean_data(name, price):
 
 def convert_currency(price, from_currency, to_currency):
     exchange_rates = {
-        'MDL': 1,        
-        'EUR': 19.5,     
+        'MDL': 1,
+        'EUR': 19.5,
     }
     
     if from_currency in exchange_rates and to_currency in exchange_rates:
@@ -65,40 +65,73 @@ def fetch_product_description(link):
     html_content = fetch_html(link)
     if html_content:
         soup = BeautifulSoup(html_content, 'html.parser')
-        description_element = soup.find('h3', class_='mb-3 fw-bold')  
+        description_element = soup.find('h3', class_='mb-3 fw-bold')
         return description_element.text.strip() if description_element else 'No description available'
     return 'Failed to fetch description'
 
 def custom_serialize(data):
     serialized = []
-    for key, value in data.items():
-        if isinstance(value, list):
-            serialized.append(f"{key}: [{','.join(map(str, value))}]")
-        elif isinstance(value, dict):
-            serialized.append(f"{key}: {{{','.join([f'{k}:{v}' for k, v in value.items()])}}}")
+    
+    def serialize_item(item):
+        if isinstance(item, dict):
+            items = [f"{serialize_item(k)}:{serialize_item(v)}" for k, v in item.items()]
+            return f"dict{{{','.join(items)}}}"
+        elif isinstance(item, list):
+            items = [serialize_item(i) for i in item]
+            return f"list[{','.join(items)}]"
+        elif isinstance(item, str):
+            return f"str({item})"
+        elif isinstance(item, int):
+            return f"int({item})"
+        elif isinstance(item, float):
+            return f"float({item})"
         else:
-            serialized.append(f"{key}: {value}")
+            return f"unknown({item})"
+    
+    for key, value in data.items():
+        serialized.append(f"{serialize_item(key)}:{serialize_item(value)}")
+    
     return "; ".join(serialized)
 
 def custom_deserialize(serialized_str):
-    deserialized = {}
-    items = serialized_str.split("; ")
-    for item in items:
-        if ': [' in item:
-            key, value = item.split(": [")
-            value = value.rstrip(']').split(',')
-            deserialized[key] = [v.strip() for v in value]
-        elif ': {' in item:
-            key, value = item.split(": {")
-            value = value.rstrip('}').split(',')
-            deserialized[key] = {}
-            for v in value:
-                k, v = v.split(':')
-                deserialized[key][k.strip()] = v.strip()
+    def deserialize_item(item_str):
+        if item_str.startswith("dict{"):
+            item_str = item_str[5:-1]  
+            items = item_str.split(",")
+            deserialized_dict = {}
+            for item in items:
+                if ':' in item:
+                    k, v = item.split(':', 1)  
+                    deserialized_dict[deserialize_item(k.strip())] = deserialize_item(v.strip())
+            return deserialized_dict
+
+        # Check if it's a list
+        elif item_str.startswith("list["):
+            item_str = item_str[5:-1]  
+            items = item_str.split(",")  
+            return [deserialize_item(i.strip()) for i in items]
+
+        # Handle primitive types
+        elif item_str.startswith("str("):
+            return item_str[4:-1]  
+        elif item_str.startswith("float("):
+            return float(item_str[6:-1])  
+        elif item_str.startswith("int("):
+            return int(item_str[4:-1])  
         else:
-            key, value = item.split(": ")
-            deserialized[key] = value.strip()
+            return item_str.strip()  
+
+    deserialized = {}
+    items = serialized_str.split("; ")  
+    for item in items:
+        if ":" in item:
+            key, value = item.split(":", 1)  
+            deserialized_key = deserialize_item(key.strip())
+            deserialized_value = deserialize_item(value.strip())
+            deserialized[deserialized_key] = deserialized_value
+
     return deserialized
+
 
 def serialize_to_json(data):
     import json
