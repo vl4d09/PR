@@ -105,13 +105,11 @@ def custom_deserialize(serialized_str):
                     deserialized_dict[deserialize_item(k.strip())] = deserialize_item(v.strip())
             return deserialized_dict
 
-        # Check if it's a list
         elif item_str.startswith("list["):
             item_str = item_str[5:-1]  
             items = item_str.split(",")  
             return [deserialize_item(i.strip()) for i in items]
 
-        # Handle primitive types
         elif item_str.startswith("str("):
             return item_str[4:-1]  
         elif item_str.startswith("float("):
