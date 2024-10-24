@@ -130,7 +130,6 @@ def custom_deserialize(serialized_str):
 
     return deserialized
 
-
 def serialize_to_json(data):
     import json
     return json.dumps(data, indent=4)
@@ -159,6 +158,10 @@ def deserialize_from_xml(serialized_str):
             product_data[child.tag] = child.text
         products.append(product_data)
     return {'filtered_products': products}
+
+def calculate_total_price(products, currency):
+    total = sum(product['price_mdl'] if currency == 'MDL' else product['price_eur'] for product in products)
+    return total
 
 url = 'https://xstore.md/monitoare'
 html_content = fetch_html(url)
@@ -206,8 +209,13 @@ if html_content:
 
     filtered_products = filter_products(product_data, 50, 5000)
 
+    total_price_mdl = calculate_total_price(filtered_products, 'MDL')
+    total_price_eur = calculate_total_price(filtered_products, 'EUR')
+
     final_data_model = {
         'filtered_products': filtered_products,
+        'total_price_mdl': total_price_mdl,
+        'total_price_eur': total_price_eur,
         'timestamp': datetime.utcnow().isoformat() + 'Z'
     }
 
