@@ -26,7 +26,6 @@ def create_table():
     conn.commit()
     conn.close()
 
-# Create a product
 @app.route('/products', methods=['POST'])
 def create_product():
     data = request.json
@@ -48,18 +47,15 @@ def create_product():
 
 @app.route('/products', methods=['GET'])
 def get_products():
-    # Get pagination parameters from query
     offset = request.args.get('offset', default=0, type=int)
     limit = request.args.get('limit', default=5, type=int)
 
     conn = get_db_connection()
     
-    # Get total count of products
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM products")
     total_count = cursor.fetchone()[0]
     
-    # Fetch paginated products
     cursor.execute("SELECT * FROM products LIMIT ? OFFSET ?", (limit, offset))
     products = cursor.fetchall()
     
