@@ -6,14 +6,12 @@ import threading
 connected_clients = {}
 
 async def chat_handler(websocket, path):
-    
     username = await websocket.recv()  
     connected_clients[websocket] = username  
     print(f"{username} joined the chat. Total clients: {len(connected_clients)}")
     
     try:
         async for message in websocket:
-            
             for client, client_username in connected_clients.items():
                 if client != websocket:
                     await client.send(f"{username}: {message}")
@@ -22,7 +20,6 @@ async def chat_handler(websocket, path):
     finally:
         del connected_clients[websocket]  
         print(f"{username} left. Total clients: {len(connected_clients)}")
-
 
 async def http_handler(request):
     return web.Response(text="HTTP Server is up and running")
