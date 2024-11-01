@@ -1,8 +1,9 @@
+import socket
 from bs4 import BeautifulSoup
 from datetime import datetime
-import requests
 import sqlite3
 from main import create_table
+import ssl
 
 def get_db_connection():
     conn = sqlite3.connect('products.db')  
@@ -10,12 +11,33 @@ def get_db_connection():
     return conn
 
 def fetch_html(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = 'https://' + url
+    host = url.split('://')[1].split('/')[0]
+    path = '/' + '/'.join(url.split('://')[1].split('/')[1:])
+
+    context = ssl.create_default_context()
+
     try:
-        response = requests.get(url)
-        response.raise_for_status()  
-        return response.text
-    except requests.RequestException as e:
-        print(f"Error fetching {url}: {e}")
+        sock = socket.create_connection((host, 443))
+        with context.wrap_socket(sock, server_hostname=host) as ssock:
+            request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\r\nConnection: close\r\n\r\n"
+            ssock.sendall(request.encode('utf-8'))
+
+            response = b""
+            while True:
+                data = ssock.recv(4096)
+                if not data:
+                    break
+                response += data
+
+            response = response.decode('utf-8')
+            headers, body = response.split("\r\n\r\n", 1)
+            
+            return body
+
+    except Exception as e:
+        print(f"Socket error: {e}")
         return None
 
 def clean_data(name, price):
@@ -53,6 +75,10 @@ def scrape_products(base_url, max_pages):
         if html_content:
             soup = BeautifulSoup(html_content, 'html.parser')
             product_tiles = soup.find_all('div', class_='col-sm-6 col-md-4')
+
+            if not product_tiles:
+                print(f"No products found on page {page}")
+                continue
 
             for product in product_tiles:
                 name_element = product.find('a', class_='xp-title')

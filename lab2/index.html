@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f2f2f2;
+        }
+        .chat-container {
+            width: 80%;
+            max-width: 600px;
+            height: 80vh;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-history {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ddd;
+        }
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #d1e7dd;
+        }
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .send-button, .leave-button {
+            padding: 10px;
+            margin-left: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .send-button:hover, .leave-button:hover {
+            background-color: #45a049;
+        }
+        .username-input {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <input type="text" id="usernameInput" class="username-input" placeholder="Enter your username..." />
+        <div class="chat-history" id="chatHistory"></div>
+        <div class="chat-input-container">
+            <input type="text" id="messageInput" class="chat-input" placeholder="Type a message..." />
+            <button id="sendButton" class="send-button">Send</button>
+            <button id="leaveButton" class="leave-button">Leave Chat</button>
+        </div>
+    </div>
+
+
+    
+    <script>
+        let ws; 
+        const chatHistory = document.getElementById('chatHistory');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const leaveButton = document.getElementById('leaveButton');
+        const usernameInput = document.getElementById('usernameInput');
+        
+        let username = '';
+        let isUserInChat = false; 
+        
+        const initializeWebSocket = () => {
+            ws = new WebSocket('ws://localhost:8765');
+        
+            ws.onopen = () => {
+                ws.send(username); 
+                isUserInChat = true; 
+                messageInput.disabled = false; 
+                leaveButton.disabled = false; 
+            };
+        
+            ws.onmessage = (event) => {
+                const message = document.createElement('div');
+                message.classList.add('chat-message');
+                message.textContent = event.data; 
+                chatHistory.appendChild(message);
+                chatHistory.scrollTop = chatHistory.scrollHeight; 
+            };
+        
+            ws.onclose = () => {
+                messageInput.disabled = true; 
+                leaveButton.disabled = true; 
+                usernameInput.style.display = 'block'; 
+                isUserInChat = false; 
+            };
+        };
+        
+        usernameInput.addEventListener('change', () => {
+            username = usernameInput.value.trim();
+            if (username && !isUserInChat) {
+                initializeWebSocket(); 
+                usernameInput.style.display = 'none'; 
+            }
+        });
+        
+        const sendMessage = () => {
+            const messageText = messageInput.value.trim();
+            if (messageText && username) {
+                const message = document.createElement('div');
+                message.classList.add('chat-message', 'user-message');
+                message.textContent = `${username}: ${messageText}`; 
+                chatHistory.appendChild(message);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+        
+                ws.send(messageText);
+        
+                messageInput.value = ''; 
+            }
+        };
+        
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        leaveButton.addEventListener('click', () => {
+            if (isUserInChat) {
+                ws.close(); 
+                usernameInput.style.display = 'block'; 
+                isUserInChat = false; 
+            }
+        });
+        
+        const rejoinChat = () => {
+            if (!isUserInChat) {
+                initializeWebSocket(); 
+            }
+        };
+        
+        usernameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && usernameInput.value) {
+                username = usernameInput.value.trim();
+                initializeWebSocket();
+                usernameInput.style.display = 'none'; 
+            }
+        });
+        </script>
+        
+</body>
+</html>
