@@ -8,7 +8,13 @@ connected_clients = {}
 async def chat_handler(websocket, path):
     username = await websocket.recv()  
     connected_clients[websocket] = username  
-    print(f"{username} joined the chat. Total clients: {len(connected_clients)}")
+    join_message = f"{username} has joined the chat."
+    print(join_message)
+    
+    
+    for client in connected_clients:
+        if client != websocket:  
+            await client.send(join_message)
     
     try:
         async for message in websocket:
@@ -18,16 +24,17 @@ async def chat_handler(websocket, path):
     except websockets.exceptions.ConnectionClosed:
         print(f"{username} disconnected")
     finally:
+        leave_message = f"{username} has left the chat."
         del connected_clients[websocket]  
-        print(f"{username} left. Total clients: {len(connected_clients)}")
+        print(leave_message)
 
-async def http_handler(request):
-    return web.Response(text="HTTP Server is up and running")
-
+        
+        for client in connected_clients:
+            await client.send(leave_message)
 
 async def init_http_server():
     app = web.Application()
-    app.add_routes([web.get('/', http_handler)])
+    app.add_routes([web.get('/', chat_handler)])
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, 'localhost', 8080)
